@@ -1,62 +1,37 @@
 package rbac
 
-import "strings"
+import (
+	"context"
+	"fmt"
+	"net/http"
+)
 
-const permissionDelimiter = ":"
-const wildcard = "*"
-
-type AccessList []Access
-
-type Access struct {
-	ResourceDefinitions []ResourceDefinition `json:"resourceDefinitions,omitempty"`
-	Permission          string               `json:"permission"`
-}
-
-type ResourceDefinition struct {
-	AttributeFilter AttributeFilter `json:"attributeFilter"`
-}
-
-type AttributeFilter struct {
-	Key       string `json:"key"`
-	Operation string `json:"operation"`
-	Value     string `json:"value"`
-}
-
-// IsAllowed returns whether an action against a resource is allowed by an AccessList
-// taking wildcards into consideration
-// TODO: Take resource definitions into account
-func (l AccessList) IsAllowed(app, res, verb string) bool {
-	for _, a := range l {
-		if a.Application() == app && matchWildcard(a.Resource(), res) && matchWildcard(a.Verb(), verb) {
-			return true
-		}
+// GetAccess returns an AccessList for a principal.
+// When username is empty, the authenticated principal is used.
+func (c *Client) GetAccess(ctx context.Context, identity string, username string) (AccessList, error) {
+	// Build request to RBAC service
+	url := c.BaseURL + "/access"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %w", err)
 	}
-	return false
-}
 
-// Application returns the name of the application in the permission
-func (a Access) Application() string {
-	return permIndex(a.Permission, 0)
-}
-
-// Resource returns the name of the resource in the permission
-func (a Access) Resource() string {
-	return permIndex(a.Permission, 1)
-}
-
-// Verb returns the verb in the permission
-func (a Access) Verb() string {
-	return permIndex(a.Permission, 2)
-}
-
-func permIndex(p string, i int) string {
-	s := strings.Split(p, permissionDelimiter)
-	if len(s) == 3 {
-		return s[i]
+	q := req.URL.Query()
+	q.Add("application", c.Application)
+	if len(username) > 0 {
+		q.Add("username", username)
 	}
-	return ""
-}
+	q.Add("limit", paginationLimit)
+	req.URL.RawQuery = q.Encode()
 
-func matchWildcard(s1, s2 string) bool {
-	return s1 == s2 || s1 == wildcard
+	// Add X-RH-Identity header for authenticating the current principal
+	req.Header.Set(identityHeader, identity)
+
+	var access AccessList
+	err = c.getParsed(req, &access)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get permitted access: %w", err)
+	}
+
+	return access, nil
 }
