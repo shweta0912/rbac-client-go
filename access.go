@@ -10,7 +10,7 @@ import (
 // When username is empty, the authenticated principal is used.
 func (c *Client) GetAccess(ctx context.Context, identity string, username string) (AccessList, error) {
 	// Build request to RBAC service
-	url := c.BaseURL + "/access"
+	url := c.BaseURL + "/access/"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request: %w", err)
