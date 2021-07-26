@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -48,7 +48,7 @@ func (c *Client) getParsed(r *http.Request, data interface{}) error {
 	body := PaginatedBody{
 		Data: &data,
 	}
-	rawBody, err := io.ReadAll(resp.Body)
+	rawBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
